@@ -1,5 +1,20 @@
 import numpy as np
 from fractions import Fraction
+import os
+
+MAX_INT = 9999999
+
+def check_same_chars(a, b):
+    a = a.split()
+    b = b.split()
+    
+    if len(a) != len(b):
+        return False
+    for char in a:
+        if char not in b:
+            return False
+
+    return True
 
 class LinearProgramming:
     def __init__(self, num_variables, num_constraints):
@@ -16,7 +31,11 @@ class LinearProgramming:
         self.basics = np.array([f'w_{i+1}' for i in range(num_constraints)])
         self.non_basics = np.array(self.name_variables)
         self.status = None
-        self.priority_index = dict()            
+        self.priority_index = dict()
+        self.first_dictionary = None  
+        self.current_dictionary = None
+        self.arti_variables = None
+        self.dict_steps = {'A': [], 'b': [], 'c': [], 'optimal': [], 'basics': [], 'non_basics': []}
         
     @property
     def name_variables(self):
@@ -35,8 +54,16 @@ class LinearProgramming:
         self.signs = np.array(signs)
         self.restricted = np.array(restricted)
         
+    def update_first_dictionary(self, first_dict):
+        self.first_dictionary = first_dict
+        return first_dict
+        
+    def update_cur_dictionary(self, cur_dict):
+        self.cur_dictionary = cur_dict
+        return cur_dict
+    
     def __str__(self):
-            
+
         res = f'{self.objective_type.title()}\t\t{self.c[0]}{self.name_variables[0]}'
         for i in range(1, self.num_variables):
             if self.c[i] >= 0:
@@ -62,7 +89,7 @@ class LinearProgramming:
                 res += f'{self.name_variables[i]} >= 0, '
             else:
                 res += f'{self.name_variables[i]} is no bound, '
-                
+        
         if self.restricted[self.num_variables-1] == 0:
             res += f'{self.name_variables[-1]} <= 0'
         elif self.restricted[self.num_variables-1] == 1:
@@ -71,17 +98,8 @@ class LinearProgramming:
             res += f'{self.name_variables[-1]} is no bound'
             
         return res
-    
-    def print_dictionary(self, basic_solution, tableau, objective_coef, c):
-        z = f'z = {c}'
-        for i in range(self.num_variables):
-            if objective_coef[i] >= 0:
-                z += f' + {objective_coef[i]}{self.non_basics[i]}'
-            else:
-                z += f' - {abs(objective_coef[i])}{self.non_basics[i]}'
-        print(z)
-        print('-'*self.num_variables*14)
-        
+
+    def generate_equations(self, basic_solution, tableau):
         equations = ''
         for i in range(self.num_constraints):
             equations += f'{self.basics[i]} = {basic_solution[i]}'
@@ -91,6 +109,20 @@ class LinearProgramming:
                 else:
                     equations += f' + {abs(tableau[i,j])}{self.non_basics[j]}'
             equations += '\n'
+        return equations
+    
+    def print_dictionary(self, basic_solution, tableau, objective_coef, c):
+
+        z = f'z = {c}'
+        for i in range(self.num_variables):
+            if objective_coef[i] >= 0:
+                z += f' + {objective_coef[i]}{self.non_basics[i]}'
+            else:
+                z += f' - {abs(objective_coef[i])}{self.non_basics[i]}'
+        print(z)
+        print('-'*self.num_variables*14)
+        
+        equations = self.generate_equations(basic_solution, tableau)
         print(equations)
     
     def normalize(self):
@@ -99,14 +131,23 @@ class LinearProgramming:
         b_new = np.copy(self.b)
         signs_new = np.copy(self.signs)
         num_variables_new = self.num_variables
+        num_constraints_new = self.num_constraints
+
+        eq_indices  = np.where(self.signs == '=')[0]
+        if len(eq_indices) > 0:
+            signs_new[signs_new == '='] = '<='
+            A_new = np.vstack((A_new, A_new[eq_indices]*(-1)))
+            signs_new = np.hstack((signs_new, ['<=']*len(eq_indices)))
+            b_new = np.hstack((b_new, b_new[eq_indices]*(-1)))
+            num_constraints_new  += len(eq_indices)
 
         neg_indices = np.where(self.restricted == 0)[0]
         unrestricted_indices = np.where(self.restricted == None)[0]
         num_variables_new += len(unrestricted_indices)
-        new_problem = LinearProgramming(num_variables_new, self.num_constraints)
-        
+        new_problem = LinearProgramming(num_variables_new, num_constraints_new)
+
         name_variables_new = []
-        
+
         for i in range(self.num_variables):
             tmp = np.where(unrestricted_indices == i)[0]
             if len(tmp):
@@ -162,8 +203,8 @@ class LinearProgramming:
                         
         ratio_indices = np.where(tableau[:, entering_variable_index] > 0)[0]
         if ratio_indices.size == 0:
-            self.status = 0
             return
+
         ratio = basic_solution[ratio_indices]/tableau[:, entering_variable_index][tableau[:, entering_variable_index] > 0]
         leaving_variable_index = ratio_indices[ratio.argmin()]
 
@@ -209,12 +250,6 @@ class LinearProgramming:
             
             if print_details:
                 print('*'*30 + f'Auxiliary Problem' + '*'*30)
-                if print_details:
-                    for key, value in self.var_change.items():
-                        if len(value) == 3:
-                            print(f'{key} = {value[0]} - {value[1]}')
-                        elif value[-1] == 1:
-                            print(f'{value[0]} = -{key}')
                 print('*'*30 + f'Dictionary {count}' + '*'*30)
                 aux_problem.print_dictionary(aux_b, aux_A, aux_c, optimal_value)
                 count += 1
@@ -280,25 +315,119 @@ class LinearProgramming:
 
         tableau, basic_solution, z_coef = normalize_problem.A.copy(), normalize_problem.b.copy(), normalize_problem.c.copy()
         return tableau, basic_solution, z_coef, optimal_value, infeasibility
+
+    def identify_equality_constraints(self):
+        n = self.A.shape[0]
+        row_indices = []
+        for i in range(n):
+            is_equal = np.all(self.A == self.A[i,:], axis=1)
+            equal_indices = np.where(is_equal)[0]
+            row_indices.append(equal_indices)
+
+        indices = set()
+        for i, t in enumerate(row_indices):
+            if t[0] == i:
+                indices.add(i)
+            if t.size > 1:
+                self.signs[i] = '='
+        indices = list(indices)
+        self.A = self.A[indices]
+        self.b = self.b[indices]
+        self.signs = self.signs[indices]
+        self.num_constraints = self.A.shape[0]
+
+
+    def process_equality(self, problem, initial_op):
+        if not np.any(self.signs == '='):
+            return False
+
+        num_equality_constraints = len(self.signs[self.signs == '='])
+        num_basics = len(problem.basics)
+        j = 0
+        basics_to_replace = []
+        identity_matrices = []
+        artificial_variables = []
         
-        
+        while num_equality_constraints:
+            basics_to_replace.append(problem.basics[num_basics - num_equality_constraints])
+            identity_matrices.append([-1 if k == num_basics - num_equality_constraints else 0 for k in range(num_basics)])
+            problem.b[num_basics - num_equality_constraints] *= -1
+            problem.A[num_basics - num_equality_constraints, :] *= -1
+            problem.basics[num_basics - num_equality_constraints] = f'a_{j+1}'
+            artificial_variables.append(f'a_{j+1}')
+            j += 1
+            num_equality_constraints -= 1
+
+        problem.arti_variables = np.array(artificial_variables)
+        identity_matrices = np.array(identity_matrices, dtype=problem.A.dtype)
+        problem.A = np.hstack((problem.A, identity_matrices.T))
+        problem.non_basics = np.hstack((problem.non_basics, basics_to_replace))
+        problem.c = np.hstack((problem.c, [0] * len(self.signs[self.signs == '='])))
+        problem.num_variables += len(self.signs[self.signs == '='])
+
+        num_equality_constraints = len(self.signs[self.signs == '='])
+
+        while num_equality_constraints:
+            problem.c += (-MAX_INT) * problem.A[num_basics - num_equality_constraints, :]
+            initial_op[0] += MAX_INT * problem.b[num_basics - num_equality_constraints]
+            num_equality_constraints -= 1
+            
+        return True
+
+  
     def optimize(self,type_rotate='Dantzig', print_details=False):
         normalize_problem = self.normalize()
+
+        if print_details:
+            for key, value in self.var_change.items():
+                if len(value) == 3:
+                    print(f'{key} = {value[0]} - {value[1]}')
+                elif value[-1] == 1:
+                    print(f'{value[0]} = -{key}')
+
+        flag = False
+        init_optimal=[0]
+
+        if self.process_equality(normalize_problem, init_optimal):
+            flag = True
+            if print_details:
+                print(f'Artifical variables: {normalize_problem.arti_variables}\n')
+
         tableau, basic_solution, z_coef, optimal_value, infeasibility = self.initial_feasible_solution(normalize_problem, print_details)
+
         if infeasibility == True:
             self.status = 2 # No solution
             optimal_value, solution = np.array([]), np.array([])
             return optimal_value, solution
+
+        if flag:
+            optimal_value += init_optimal[0]
+            
         count = 1
+        count_duplicate = 0
+        equations = normalize_problem.generate_equations(basic_solution, tableau)
+        normalize_problem.first_dictionary = normalize_problem.update_first_dictionary(equations)
+
         if print_details:
             print('*'*30 + f'Dictionary {count}' + '*'*30)
             normalize_problem.print_dictionary(basic_solution, tableau, z_coef, optimal_value)
             count += 1
+        
+        self.dict_steps['A'].append(np.copy(tableau))
+        self.dict_steps['b'].append(np.copy(basic_solution))
+        self.dict_steps['c'].append(np.copy(z_coef))
+        self.dict_steps['optimal'].append(np.copy(optimal_value))
+        self.dict_steps['basics'].append(np.copy(normalize_problem.basics))
+        self.dict_steps['non_basics'].append(np.copy(normalize_problem.non_basics))
+
+
         while np.any(z_coef < 0):
             try:
                 tableau, basic_solution, z_coef, optimal_value = normalize_problem.update_tableau(tableau, basic_solution, z_coef, optimal_value, type_rotate, print_details)
             except:              
                 # Unboundedness
+                self.status = 0
+
                 if self.objective_type.strip().lower() == 'max':
                     optimal_value = float('inf')
                 else:
@@ -311,23 +440,56 @@ class LinearProgramming:
                 normalize_problem.print_dictionary(basic_solution, tableau, z_coef, optimal_value)
                 count += 1
             
+            self.dict_steps['A'].append(np.copy(tableau))
+            self.dict_steps['b'].append(np.copy(basic_solution))
+            self.dict_steps['c'].append(np.copy(z_coef))
+            self.dict_steps['optimal'].append(np.copy(optimal_value))
+            self.dict_steps['basics'].append(np.copy(normalize_problem.basics))
+            self.dict_steps['non_basics'].append(np.copy(normalize_problem.non_basics))
+
+            equations = normalize_problem.generate_equations(basic_solution, tableau)
+            normalize_problem.current_dictionary = normalize_problem.update_cur_dictionary(equations)
+            isSameDict = check_same_chars(normalize_problem.first_dictionary, normalize_problem.current_dictionary) == True
+
+            if isSameDict:
+                count_duplicate += 1
+            if isSameDict and count_duplicate == 1:
+                self.dict_steps = {'A': [], 'b': [], 'c': [], 'optimal': [], 'basics': [], 'non_basics': []}
+                raise Exception('Warning: The simplex method with Dantzig occurs cycling!')
+            
         if self.objective_type.strip().lower() == 'max':
             optimal_value *= -1
-            
-        if np.any(basic_solution < 0):
-            self.status = 2 # No solution
-        elif np.all(basic_solution > 0):
-            self.status = 3 # Optimization terminated successfully
+
+        self.status=1    # ??????
+
+        # if np.any(basic_solution < 0):
+        #     self.status = 2 # No solution
+        # elif np.all(basic_solution > 0):
+        #     self.status = 3 # Optimization terminated successfully
+        # else:
+        #     self.status = 1 # Infinitely many roots
+        #     return optimal_value, np.array([],dtype=self.A.dtype)
+
+        if normalize_problem.arti_variables is not None:
+            l = len(np.isin(normalize_problem.arti_variables, normalize_problem.non_basics))
+
+            for i, basic in enumerate(normalize_problem.basics):
+                if normalize_problem.b[i] == 0 and np.where(normalize_problem.arti_variables == basic)[0].size:
+                    l += 1
+            if l != normalize_problem.arti_variables.size:
+                self.status = 2
+                optimal_value, solution = np.array([]), np.array([])
+                return optimal_value, solution
         else:
-            self.status = 1 # Infinitely many roots
-            return optimal_value, np.array([],dtype=self.A.dtype)
-            
-        x = np.zeros(normalize_problem.num_variables,dtype=self.A.dtype)
-        for i in range(normalize_problem.num_variables):
+            l = 0
+
+        x = np.zeros(normalize_problem.num_variables-l,dtype=self.A.dtype)
+        for i in range(normalize_problem.num_variables-l):
             tmp = np.where(normalize_problem.basics == normalize_problem.name_variables[i])[0]
+
             if len(tmp):
                 x[i] = basic_solution[tmp[0]]
-        
+
         solution = np.zeros(self.num_variables,dtype=self.A.dtype)
         p = 0
         for i, name in enumerate(self.name_variables):
@@ -355,6 +517,10 @@ if __name__ == "__main__":
 
     problem = LinearProgramming(4,3)
     problem.generate('min', c_frac, A_frac, b_frac, ['<=', '<=', '<='], (1, 1, 1,1))
-    print(problem.optimize(type_rotate='Bland', print_details=True))
-
-
+    try:
+        problem.optimize(type_rotate='Dantzig', print_details=True)
+    except Exception as err:
+        # os.system('cls')
+        print(err)
+        print('\n' + '*'*35 + f'Bland' + '*'*35 + '\n')
+        optimal_value, solution = problem.optimize(type_rotate='Bland', print_details=True)

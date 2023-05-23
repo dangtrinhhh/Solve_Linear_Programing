@@ -1,6 +1,7 @@
 import numpy as np
 from fractions import Fraction
 from simplex import LinearProgramming
+import os
 
 with open('input.txt', 'r') as rf:
         lines = rf.readlines()
@@ -27,10 +28,27 @@ A_frac = np.array([[Fraction(col) for col in row] for row in A])
 
 problem = LinearProgramming(num_variables, num_constraints)
 problem.generate(objective_type, c_frac, A_frac, b_frac, signs, restricted)
-optimal_value, solution = problem.optimize(type_rotate='Dantzig', print_details=True)
-print(f'Optimal value: {optimal_value}')
+problem.identify_equality_constraints()
 
-res = 'Solution: ('
-for i in range(num_variables-1):
-    res += f'{solution[i]}, '
-print(res + f'{solution[num_variables-1]})')
+try:
+    optimal_value, solution = problem.optimize(type_rotate='Dantzig', print_details=True)
+except Exception as err:
+    # os.system('cls')
+    print(err)
+    print('\n' + '*'*35 + f'Bland' + '*'*35 + '\n')
+    optimal_value, solution = problem.optimize(type_rotate='Bland', print_details=True)
+
+print(problem.dict_steps)
+
+if problem.status == 2: # No solution
+    print('Status: No solution')
+elif problem.status == 0: # Unboundedness
+    print('Status: The problem is unboundedness')
+    print(f'Optimal value: {optimal_value}')
+else: # ??????
+    print('Status: The solution was found')
+    print(f'Optimal value: {optimal_value}')
+    res = 'Solution: ('
+    for i in range(num_variables-1):
+        res += f'{solution[i]}, '
+    print(res + f'{solution[num_variables-1]})')
