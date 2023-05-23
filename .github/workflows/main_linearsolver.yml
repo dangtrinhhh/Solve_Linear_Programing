@@ -60,4 +60,4 @@ jobs:
         with:
           app-name: 'linearSolver'
           slot-name: 'Production'
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_D9CBC97F239F48178CA8E51E78F2AC6A }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_B048F116B75C456EB066B4FAB90A8BF2 }}
