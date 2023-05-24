@@ -5,12 +5,12 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="keywords" content="Linear math solver">
-    <link rel="icon" href="../assets/img/logo.png" type="image/x-icon" />
+    <link rel="icon" href="{{url_for('static', filename='images/logo.png')}}" type="image/x-icon" />
     <title>Linear Programming Solver</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #f2f2f2;
+            background-image: url({{url_for('static', filename='images/gau.jpg')}});
         }
 
         .container {
@@ -18,13 +18,15 @@
             margin: 0 auto;
             margin-top: 30px;
             padding: 20px;
-            background-color: #fff;
+            background-color: #fff; /* Màu nền */
             border-radius: 5px;
+            border: 2px solid #004080;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         }
 
         h1 {
             text-align: center;
+            color: #721616; /* Màu chữ */
         }
 
         form {
@@ -35,6 +37,7 @@
             display: block;
             font-weight: bold;
             margin-bottom: 5px;
+            color: #721616; /* Màu chữ */
         }
 
         input[type="text"],
@@ -48,7 +51,7 @@
         }
 
         .btn {
-            background-color: #4CAF50;
+            background-color: #721616; /* Màu nút */
             color: #fff;
             padding: 10px 15px;
             border: none;
@@ -57,7 +60,7 @@
         }
 
         .btn:hover {
-            background-color: #45a049;
+            background-color: #721616; /* Màu nút */
         }
 
         .input-container {
@@ -185,7 +188,7 @@
           
             // Tạo thẻ <label> cho tên biến
             var label = document.createElement("label");
-            label.textContent = "x_" + (i + 1) + " ";
+            label.innerHTML = "x" + "<sub>" + (i + 1) + "</sub>" + " ";
             label.classList.add("variable-label");
           
             // Tạo thẻ <select> cho ô chọn giá trị
