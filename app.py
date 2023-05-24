@@ -38,7 +38,12 @@ def result():
         A.append([float(elements[j]) for j in range(num_variables)])
 
     # Rang buoc dau: 1 la x >= 0, 0 la x <= 0, None la x tuy y
-    restricted = tuple([None if r.strip().lower() == 'none' else int(r)  for r in request.form['restrictions'].split()])
+    temp = []
+    for i in range(num_variables):
+        temp.append(request.form[f'restriction{i}'])
+        print(temp)
+    
+    restricted = tuple([None if r.strip().lower() == 'none' else int(r)  for r in temp])
 
     c_frac = np.array([Fraction(i) for i in c])
     b_frac = np.array([Fraction(i) for i in b])
