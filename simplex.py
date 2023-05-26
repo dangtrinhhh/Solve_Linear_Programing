@@ -297,13 +297,13 @@ class LinearProgramming:
                     print('*'*30 + f'Dictionary {count}' + '*'*30)
                     aux_problem.print_dictionary(b_temp, tableau_temp, z_coef_temp, optimal_value)
                     count += 1
-                    
+                
                 self.dict_steps['A'].append(np.copy(tableau_temp))
                 self.dict_steps['b'].append(np.copy(b_temp))
                 self.dict_steps['c'].append(np.copy(z_coef_temp))
                 self.dict_steps['optimal'].append(np.copy(optimal_value))
                 self.dict_steps['basics'].append(np.copy(aux_problem.basics))
-            self.dict_steps['non_basics'].append(np.copy(aux_problem.non_basics))
+                self.dict_steps['non_basics'].append(np.copy(aux_problem.non_basics))
             
             if not (np.sum(z_coef_temp) == 1 and z_coef_temp[z_coef_temp == 0].size == z_coef_temp.size - 1 and aux_problem.non_basics[np.where(z_coef_temp == 1)[0]] == 'x_0'):
                 infeasibility = True
