@@ -5,6 +5,78 @@ import numpy as np
 from fractions import Fraction
 from simplex import LinearProgramming
 
+def handlePrintSubVar(arr):
+    basics = []
+    # Lặp qua từng phần tử trong mảng arr
+    if(len(arr) != 0):
+        for sublist in arr:
+            temp = []
+            for item in sublist:
+                # Tách ký tự đầu tiên và hệ số sau ký tự "_"
+                character = item[0]
+                coefficient = item[2:]
+                
+                # Sử dụng phương thức format để tạo chuỗi a<sub>i</sub>
+                formatted_string = "{}<sub>{}</sub>".format(character, coefficient)
+                
+                # Thêm chuỗi đã được định dạng vào mảng tạm thời
+                temp.append(formatted_string)
+            
+            # Thêm mảng tạm vào mảng b
+            basics.append(temp)
+    return basics
+
+def handlePrintStatus(arr):
+    converted_array = []
+    for item in arr:
+        sub_array = []
+        pairs = item.split(', ')
+        for pair in pairs:
+            character, coefficient = pair.split('_')
+            formatted_string = "{}<sub>{}</sub>".format(character, coefficient[0])
+            sub_array.append(formatted_string)
+        converted_array.append(sub_array)
+    return converted_array
+
+def printDictionary(problem, problem_type):
+    result = ''
+    
+    basics = handlePrintSubVar(problem_type['basics'])
+
+    nonBasics = handlePrintSubVar(problem_type['non_basics'])
+             
+    problemStatus = handlePrintStatus(problem_type['status'])
+    
+    if(len(problem_type['optimal']) != 0):
+        for i in range(len(problem_type['optimal'])) :
+            if (i != 0 and i-1 < len(problem_type['status'])):
+                result += '<br><b style="color: blue;">' + problemStatus[i-1][0] + ' entering, ' + problemStatus[i-1][1] + ' leaving' + '</b>'
+                
+            result += '<br>' + '*'*30 + f'<b>Dictionary {i + 1}</b>' + '*'*30 + '<br><br>'
+            result += f"z = {problem_type['optimal'][i]}"
+            for j in range(len(problem_type['c'][i])):
+                if (problem_type['c'][i][j] >= 0):
+                    result += f" + {abs(problem_type['c'][i][j])}{nonBasics[i][j]}"
+                else:
+                    result += f" - {abs(problem_type['c'][i][j])}{nonBasics[i][j]}"
+                    
+                
+            result += '<br>' + '_'*problem.num_variables*8
+            
+            for j in range(len(problem_type['A'][i])):
+                result += f"<br>{basics[i][j]} = {problem_type['b'][i][j]}"
+                for k in range(len(problem_type['A'][i][j])):
+                    # if nonBasics and j < len(nonBasics) and k < len(nonBasics[j]):
+                    if (-problem_type['A'][i][j][k] >= 0):
+                        result += f" + {abs(problem_type['A'][i][j][k])}{nonBasics[i][k]}"
+                    else:
+                        result += f" - {abs(problem_type['A'][i][j][k])}{nonBasics[i][k]}"
+            result += '<br>'
+    print(problem_type['A'])
+    print(problem_type['non_basics'])
+    print('Result', result)
+    return result        
+
 app = Flask(__name__)
 
 # Cấu hình đường dẫn đến thư mục templates
@@ -16,13 +88,12 @@ def home():
     return render_template('home.html')
 
 @app.route('/result', methods=['POST'])
+
 def result():
     print(request.data)
     num_variables = int(request.form['numVariables'])
     num_constraints = int(request.form['numConstraints'])
     objective_type = request.form['objectiveType']
-
-
     
     c = [float(i) for i in request.form['objectiveCoeff'].split()]
 
@@ -65,80 +136,20 @@ def result():
         output_data += str(err) + '<br>'
         output_data += str('<br>' + '*'*33 + f'Bland' + '*'*33 + '<br>')
         optimal_value, solution = problem.optimize(type_rotate='Bland', print_details=True)
+        
+    # Artifical variables: ['a_1']
     
-    
-    print("AAAAA",problem.dict_steps['A'])
-    print("BBBBBBB",problem.dict_steps['basics'])
-    print("NNNNNNN",problem.dict_steps['non_basics'])
-    
-    # Xử lí output để hiển thị trong html
-    basics = []
-    # Lặp qua từng phần tử trong mảng a
-    if(len(problem.dict_steps['basics']) != 0):
-        for sublist in problem.dict_steps['basics']:
-            temp = []
-            for item in sublist:
-                # Tách ký tự đầu tiên và hệ số sau ký tự "_"
-                character = item[0]
-                coefficient = item[2:]
-                
-                # Sử dụng phương thức format để tạo chuỗi a<sub>i</sub>
-                formatted_string = "{}<sub>{}</sub>".format(character, coefficient)
-                
-                # Thêm chuỗi đã được định dạng vào mảng tạm thời
-                temp.append(formatted_string)
-            
-            # Thêm mảng tạm vào mảng b
-            basics.append(temp)
-    
-    nonBasics = []
-
-    # Lặp qua từng phần tử trong mảng a
-    if(len(problem.dict_steps['non_basics']) != 0):
-        for sublist in problem.dict_steps['non_basics']:
-            temp = []
-            for item in sublist:
-                # Tách ký tự đầu tiên và hệ số sau ký tự "_"
-                character = item[0]
-                coefficient = item[2:]
-                
-                # Sử dụng phương thức format để tạo chuỗi a<sub>i</sub>
-                formatted_string = "{}<sub>{}</sub>".format(character, coefficient)
-                
-                # Thêm chuỗi đã được định dạng vào mảng tạm thời
-                temp.append(formatted_string)
-            
-            # Thêm mảng tạm vào mảng b
-            nonBasics.append(temp)
-    
-    print(nonBasics)
-            
-    result = ''
-    if(len(problem.dict_steps['optimal']) != 0):
-        for i in range(len(problem.dict_steps['optimal'])) :
-            result += '<br>' + '*'*30 + f'Dictionary {i + 1}' + '*'*30 + '<br><br>'
-            result += f"z = {problem.dict_steps['optimal'][i]}"
-            for j in range(len(problem.dict_steps['c'][i])):
-                if (problem.dict_steps['c'][i][j] >= 0):
-                    result += f" + {abs(problem.dict_steps['c'][i][j])}{nonBasics[i][j]}"
-                else:
-                    result += f" - {abs(problem.dict_steps['c'][i][j])}{nonBasics[i][j]}"
-                    
-                
-            result += '<br>' + '_'*problem.num_variables*8
-            
-            for j in range(len(problem.dict_steps['A'][i])):
-                result += f"<br>{basics[i][j]} = {problem.dict_steps['b'][i][j]}"
-                for k in range(len(problem.dict_steps['A'][i][j])):
-                    if nonBasics and j < len(nonBasics) and k < len(nonBasics[j]):
-                        if (-problem.dict_steps['A'][i][j][k] >= 0):
-                            result += f" + {abs(problem.dict_steps['A'][i][j][k])}{nonBasics[j][k]}"
-                        else:
-                            result += f" - {abs(problem.dict_steps['A'][i][j][k])}{nonBasics[j][k]}"
-            result += '<br>'
-    
-    output_data += result
-
+    if(len(problem.dict_steps['Aux']['A']) > 0 and len(problem.dict_steps['Prime']['A']) > 0):
+        output_data += str('*'*30 + f'<b>Auxiliary Problem</b>' + '*'*30 + '<br>')
+        output_data += printDictionary(problem, problem.dict_steps['Aux'])
+        output_data += str('*'*30 + f'<b>Prime Problem</b>' + '*'*30 + '<br>')
+        output_data += printDictionary(problem, problem.dict_steps['Prime'])
+    elif (len(problem.dict_steps['Prime']['A']) > 0):
+        output_data += str('*'*30 + f'<b>Prime Problem</b>' + '*'*30 + '<br>')
+        output_data += printDictionary(problem, problem.dict_steps['Prime'])
+    else:
+        output_data += str('*'*30 + f'<b>Auxiliary Problem</b>' + '*'*30 + '<br>')
+        output_data += printDictionary(problem, problem.dict_steps['Aux'])
 
     if problem.status == 2: # No solution
         output_data += str('<br><b>Status: </b>No solution<br>')
