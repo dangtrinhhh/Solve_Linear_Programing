@@ -72,9 +72,6 @@ def printDictionary(problem, problem_type):
                     else:
                         result += f" - {abs(problem_type['A'][i][j][k])}{nonBasics[i][k]}"
             result += '<br>'
-    print(problem_type['A'])
-    print(problem_type['non_basics'])
-    print('Result', result)
     return result        
 
 app = Flask(__name__)
@@ -138,6 +135,15 @@ def result():
         optimal_value, solution = problem.optimize(type_rotate='Bland', print_details=True)
         
     # Artifical variables: ['a_1']
+    print(problem.dict_steps['var_change'])
+    if (len(problem.dict_steps['var_change']) > 0):
+        output_data += 'Artifical variables: '
+        for i in range(len(problem.dict_steps['var_change'])):
+            if (i != len(problem.dict_steps['var_change'] - 1)):
+                output_data += problem.dict_steps['var_change'] + ', '
+            else:
+                output_data += problem.dict_steps['var_change']
+    output_data += '<br>'
     
     if(len(problem.dict_steps['Aux']['A']) > 0 and len(problem.dict_steps['Prime']['A']) > 0):
         output_data += str('*'*30 + f'<b>Auxiliary Problem</b>' + '*'*30 + '<br>')
