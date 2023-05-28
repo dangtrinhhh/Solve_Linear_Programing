@@ -4,6 +4,7 @@ from flask import Flask, request, render_template
 import numpy as np
 from fractions import Fraction
 from simplex import LinearProgramming
+import re
 
 def handlePrintSubVar(arr):
     basics = []
@@ -74,6 +75,12 @@ def printDictionary(problem, problem_type):
             result += '<br>'
     return result        
 
+def replace_subscripts(string):
+    pattern = r'(\w)_(\w)'
+    repl = r'\1<sub>\2</sub>'
+    result = re.sub(pattern, repl, string)
+    return result
+
 app = Flask(__name__)
 
 # Cấu hình đường dẫn đến thư mục templates
@@ -137,13 +144,14 @@ def result():
     # Artifical variables: ['a_1']
     print(problem.dict_steps['var_change'])
     if (len(problem.dict_steps['var_change']) > 0):
-        output_data += 'Artifical variables: '
+        output_data += '<b>Artificial variables: '
         for i in range(len(problem.dict_steps['var_change'])):
-            if (i != len(problem.dict_steps['var_change'] - 1)):
-                output_data += problem.dict_steps['var_change'] + ', '
+            temp = replace_subscripts(problem.dict_steps['var_change'][i])
+            if (i != len(problem.dict_steps['var_change']) - 1):
+                output_data += temp + ', '
             else:
-                output_data += problem.dict_steps['var_change']
-    output_data += '<br>'
+                output_data += temp
+    output_data += '</b><br><br>'
     
     if(len(problem.dict_steps['Aux']['A']) > 0 and len(problem.dict_steps['Prime']['A']) > 0):
         output_data += str('*'*30 + f'<b>Auxiliary Problem</b>' + '*'*30 + '<br>')
